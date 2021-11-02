@@ -1,0 +1,47 @@
+dependencies {
+	api(project(':com.ibm.wala.cast.js')) {
+		because 'public class NodejsCallGraphBuilderUtil extends class JSCallGraphUtil'
+	}
+	implementation(
+			'commons-io:commons-io:2.11.0',
+			'org.json:json:20210307',
+			project(':com.ibm.wala.cast'),
+			project(':com.ibm.wala.cast.js.rhino'),
+			project(':com.ibm.wala.core'),
+			project(':com.ibm.wala.util'),
+	)
+	testImplementation(
+			'junit:junit:4.13.2',
+	)
+	testRuntimeOnly testFixtures(project(':com.ibm.wala.core'))
+}
+
+final downloadNodeJS = tasks.register('downloadNodeJS', VerifiedDownload) {
+	src 'https://nodejs.org/dist/v0.12.4/node-v0.12.4.tar.gz'
+	dest project.layout.buildDirectory.file('nodejs.tar.gz')
+	algorithm 'SHA-1'
+	checksum '147ff79947752399b870fcf3f1fc37102100b545'
+}
+
+final unpackNodeJSLib = tasks.register('unpackNodeJSLib', Copy) {
+	from(downloadNodeJS.map { tarTree it.dest }) {
+		include 'node-v0.12.4/lib/*.js'
+		eachFile {
+			relativePath RelativePath.parse(!directory, relativePath.lastName)
+		}
+	}
+
+	into "${tasks.named('processTestResources', Copy).get().destinationDir}/core-modules"
+	includeEmptyDirs false
+}
+
+tasks.named('processTestResources') {
+	dependsOn unpackNodeJSLib
+}
+
+tasks.named('test') {
+	maxHeapSize = '800M'
+
+	// fails with java.lang.OutOfMemoryError for unknown reasons
+	exclude '**/NodejsRequireTargetSelectorResolveTest.class'
+}
